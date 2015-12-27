@@ -7,13 +7,42 @@ output: html_document
 
 We first load the appropriate libraries and data set
 ```{r}
-library(caret); library(ggplot2); library(rpart)
-training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", header=TRUE)
-testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", header=TRUE)
+library(caret); library(ggplot2); library(rpart); library(parallel); library(randomForest)
+train <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", header=TRUE)
+test <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", header=TRUE)
 ```
 
-
-```{r, echo=FALSE}
-
+Exploratory data analysis
+```{r, results="hide"}
+str(train)
+summary(train)
+head(train)
 ```
 
+Cleaning and Processing data
+Remove columns with factor variables and NAs, as it will slow the tree building. Remove first 7 columns as they are timers and not from accelerometer
+```{r}
+training <- train[, colSums(is.na(train)) == 0]
+training <- training[8:ncol(training)]
+classe <- training[,ncol(training)]
+training <- training[, !sapply(training, is.factor)]
+training <- cbind(training, classe)
+```
+
+Set seed to 314
+Opt to use k-fold sampling for cross validation on training set becuse 19622 observation is a sufficient sample size to split the data. Repeated random subsampling may leave out some of the data. Choose to create 10 folds
+```{r}
+set.seed(314)
+folds <- createFolds(y=train$classe,k=10,
+                             list=TRUE,returnTrain=TRUE)
+folds[[1]][1:10]
+```
+
+Use randomforest algorithm to run training model predictions
+```{r, cache=TRUE}
+ttrain <- training[folds[[1]],]
+ttest <- training[-folds[[1]],]
+fit <- randomForest(classe ~ ., data=ttrain, prox=TRUE, ntree=200)
+pred <- predict(fit,ttest)
+table(pred,ttest$classe)
+```
