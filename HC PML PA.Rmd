@@ -30,7 +30,9 @@ training <- cbind(training, classe)
 ```
 
 Set seed to 314
-Opt to use k-fold sampling for cross validation on training set becuse 19622 observation is a sufficient sample size to split the data. Repeated random subsampling may leave out some of the data. Choose to create 10 folds
+Opt to use k-fold sampling for cross validation on training set becuse 19622 observation is a sufficient sample size to split the data. Repeated random subsampling may leave out some of the data. Choose to create 5 folds
+
+Use randomforest algorithm to run training model predictions
 ```{r}
 set.seed(314)
 folds <- createFolds(y=train$classe,k=10,
@@ -38,11 +40,25 @@ folds <- createFolds(y=train$classe,k=10,
 folds[[1]][1:10]
 ```
 
-Use randomforest algorithm to run training model predictions
 ```{r, cache=TRUE}
-ttrain <- training[folds[[1]],]
-ttest <- training[-folds[[1]],]
-fit <- randomForest(classe ~ ., data=ttrain, prox=TRUE, ntree=200)
-pred <- predict(fit,ttest)
-table(pred,ttest$classe)
+set.seed(314)
+tc <- trainControl(method = "oob", number = 5, p = 0.75,  allowParallel = TRUE)
+modelfit <- train(classe ~., method = "rf", data = training, trControl = tc, prox = TRUE)
+
+#ttrain <- training[folds[[1]],]
+#ttest <- training[-folds[[1]],]
+#fit <- randomForest(classe ~ ., data=ttrain, prox=TRUE, ntree=200)
+pred <- predict(modelfit,test)
+table(pred,test$classe)
+answers <- pred
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(answers)
 ```
