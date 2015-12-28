@@ -30,26 +30,46 @@ training <- cbind(training, classe)
 ```
 
 Set seed to 314
-Opt to use k-fold sampling for cross validation on training set becuse 19622 observation is a sufficient sample size to split the data. Repeated random subsampling may leave out some of the data. Choose to create 5 folds
-
-Use randomforest algorithm to run training model predictions
+Create training and testing data sets
 ```{r}
 set.seed(314)
-folds <- createFolds(y=train$classe,k=10,
-                             list=TRUE,returnTrain=TRUE)
-folds[[1]][1:10]
+inTrain <- createDataPartition(y=training$classe, p=0.8, list=FALSE)
+traindat <- training[inTrain,]
+testdat <- training[-inTrain,]
 ```
 
+Exploratory data analysis with PCA
+want to determine any strong correlators
+```{r}
+M <- abs(cor(traindat[,-53])) ## finds correlation between all columns
+diag(M) <- 0  ## sets diagonal of table to 0 because by default, diagonal is correlation of var with itself, which is always 1.
+which(M > 0.95, arr.ind =T) ## find which variables have > 0.95 correlation
+pairs(traindat[,c(4,10,8,1)], col = traindat$classe)
+
+preProc <- preProcess(traindat[,-53], method="pca",pcaComp=2)
+trainPC <- predict(preProc,traindat[,-53])
+qplot(trainPC[,1],trainPC[,2],col=traindat$classe)
+```
+Using any kind of linear regression or PCA analysis seems to do a poor job separating data clusters by classe
+
+Use randomforest algorithm to run training model predictions, with an out of bag method of drawing data.
+
+Opt to use k-fold sampling for cross validation on training set becuse 19622 observation is a sufficient sample size to split the data. Repeated random subsampling may leave out some of the data. Choose to create 5 folds
 ```{r, cache=TRUE}
 set.seed(314)
-tc <- trainControl(method = "oob", number = 5, p = 0.75,  allowParallel = TRUE)
-modelfit <- train(classe ~., method = "rf", data = training, trControl = tc, prox = TRUE)
+tc <- trainControl(method = "oob", number = 5, p = 0.8,  allowParallel = TRUE)
+modelfit <- train(classe ~., method = "rf", data = traindat, trControl = tc, prox = TRUE)
 
-#ttrain <- training[folds[[1]],]
-#ttest <- training[-folds[[1]],]
-#fit <- randomForest(classe ~ ., data=ttrain, prox=TRUE, ntree=200)
+modelfit$finalModel
+pred <- predict(modelfit,testdat)
+table(pred,testdat$classe)
+confusionMatrix(testdat$classe,pred)
+```
+The confusion matrix estimates the out of bag error rate of the predicted modelfit is 0.55%. The accuracy on the testing data is 100%
+
+for testing submission
+```{r}
 pred <- predict(modelfit,test)
-table(pred,test$classe)
 answers <- pred
 
 pml_write_files = function(x){
